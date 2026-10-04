@@ -314,15 +314,41 @@ function importData(json){
     alert('无法识别此 JSON 格式\n\n支持：\n• 聊天导出（含 conversations）\n• 完整备份（含 state）');
     return;
   }
-  newChats.sort(function(a,b){
+
+  // ★★★ 修改部分：合并去重逻辑 ★★★
+  newChats.forEach(function(nc){
+    var existing = chats.find(function(c){ return c.agentId === nc.agentId });
+    if(existing){
+      // 如果已有这个智能体，按消息 ID 或时间+内容去重合并
+      var existingMsgIds = {};
+      existing.messages.forEach(function(m){ existingMsgIds[m.id] = 1 });
+      
+      nc.messages.forEach(function(m){
+        // 如果消息 ID 已存在，或者时间+内容重复，就跳过
+        var timeContentKey = m.time + '_' + m.content;
+        var isDuplicate = existingMsgIds[m.id] || existing.messages.some(function(em){ return em.time === m.time && em.content === m.content });
+        if(!isDuplicate){
+          existing.messages.push(m);
+        }
+      });
+      // 合并后按时间排序
+      existing.messages.sort(function(a,b){ return a.time - b.time });
+    }else{
+      // 如果是新的智能体，直接添加
+      chats.push(nc);
+    }
+  });
+
+  // 重新按最新消息排序整个列表
+  chats.sort(function(a,b){
     var ta = a.messages[a.messages.length-1];
     var tb = b.messages[b.messages.length-1];
     return (tb?tb.time:0) - (ta?ta.time:0);
   });
-  chats = newChats;
+
   saveChats();
   showList();
-  alert('已导入 ' + chats.length + ' 个对话 · 共 ' +
+  alert('合并完成！目前共 ' + chats.length + ' 个对话 · 共 ' +
     chats.reduce(function(s,c){return s+c.messages.length},0) + ' 条消息');
 }
 
