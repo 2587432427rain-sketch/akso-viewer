@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
+<title>Akso · 聊天记录查看器</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#fafcff;--sky:#dbebf8;--sky3:#b9d8ef;
+  --ink:#2c3e50;--ink2:#54728c;--soft:#8fa5b8;--faint:#c2d1df;
+  --card:rgba(255,255,255,.55);--card2:rgba(255,255,255,.75);
+  --line:rgba(0,0,0,.04);
+  --font:-apple-system,BlinkMacSystemFont,'SF Pro Rounded','PingFang SC',sans-serif;
+  --serif:'Georgia','Noto Serif SC',serif;
+  --mono:'SF Mono',Menlo,monospace;
+}
+html,body{height:100%;overflow:hidden;font-family:var(--font);color:var(--ink);background:var(--bg)}
+.page{position:fixed;inset:0;display:none;flex-direction:column;background:var(--bg);z-index:1}
+.page.on{display:flex}
+
+#welcome{align-items:center;justify-content:center;padding:40px 24px;background:linear-gradient(160deg,#e5f0f8,#fafcff 60%,#dbebf8)}
+.welcome-card{text-align:center;max-width:360px;width:100%}
+.logo{width:80px;height:80px;margin:0 auto 22px;border-radius:24px;background:linear-gradient(135deg,var(--sky),var(--sky3));display:flex;align-items:center;justify-content:center;font-size:34px;color:#fff;box-shadow:0 8px 26px rgba(80,140,200,.22)}
+#welcome h1{font-size:22px;font-weight:700;margin-bottom:8px;letter-spacing:.5px}
+#welcome .sub{font-size:13px;color:var(--soft);margin-bottom:28px;line-height:1.6}
+.primary-btn{width:100%;padding:14px;border:none;border-radius:16px;background:linear-gradient(135deg,var(--sky),var(--sky3));color:#fff;font-size:14px;font-weight:700;letter-spacing:1px;box-shadow:0 6px 20px rgba(80,140,200,.25);cursor:pointer;font-family:var(--font)}
+.primary-btn:active{transform:scale(.97)}
+.hint{margin-top:18px;font-size:11px;color:var(--faint);letter-spacing:.5px;line-height:1.7}
+.drop-zone{margin-top:22px;padding:20px;border:2px dashed rgba(120,160,200,.35);border-radius:16px;color:var(--soft);font-size:12px;transition:all .2s}
+.drop-zone.hover{border-color:var(--ink2);background:rgba(168,213,237,.15);color:var(--ink2)}
+
+.header{display:flex;align-items:center;padding:12px 16px;min-height:56px;flex-shrink:0;gap:10px;background:rgba(255,255,255,.72);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid var(--line);padding-top:calc(12px + env(safe-area-inset-top,0px))}
+.title-wrap{flex:1;min-width:0}
+.title-wrap.center{text-align:center}
+.title{font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sub{font-size:10px;color:var(--soft);letter-spacing:1.5px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.icon-btn{width:36px;height:36px;border-radius:12px;border:none;background:transparent;color:var(--ink2);font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;font-family:var(--font)}
+.icon-btn:active{background:var(--card2)}
+.back{width:36px;height:36px;border-radius:12px;border:none;background:transparent;color:var(--ink);font-size:28px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-weight:300;line-height:1;flex-shrink:0;padding-bottom:4px}
+.back:active{background:var(--card2)}
+
+.chat-list{flex:1;overflow-y:auto;padding:8px 8px 20px;-webkit-overflow-scrolling:touch}
+.list-item{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:18px;cursor:pointer}
+.list-item:active{background:var(--card);transform:scale(.99)}
+.item-avatar{width:50px;height:50px;border-radius:15px;flex-shrink:0;background:linear-gradient(135deg,var(--sky),var(--sky3));display:flex;align-items:center;justify-content:center;color:#fff;font-size:20px;font-weight:600;overflow:hidden;box-shadow:0 2px 10px rgba(80,140,200,.15)}
+.item-avatar img{width:100%;height:100%;object-fit:cover}
+.item-mid{flex:1;min-width:0}
+.item-name{font-size:15px;font-weight:600;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item-preview{font-size:12px;color:var(--soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item-right{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0}
+.item-time{font-size:10px;color:var(--faint);font-family:var(--mono)}
+.item-count{font-size:10px;color:var(--ink2);background:rgba(168,213,237,.3);padding:2px 8px;border-radius:8px;font-weight:600}
+
+.chat-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px 12px 22px;background-color:#fafcff;background-size:cover;background-position:center}
+.load-more{text-align:center;font-size:12px;color:var(--ink2);padding:12px 0;cursor:pointer;user-select:none;font-weight:600}
+.load-more:active{opacity:.6}
+.day-sep{text-align:center;font-size:11px;color:var(--faint);margin:16px 0 12px;letter-spacing:.5px;font-family:var(--mono)}
+.msg-row{display:flex;margin-bottom:12px;align-items:flex-start;gap:8px;animation:pop .3s cubic-bezier(.34,1.4,.64,1)}
+@keyframes pop{from{opacity:0;transform:translateY(5px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+.msg-row.me{flex-direction:row-reverse}
+.avatar-sm{width:36px;height:36px;border-radius:10px;flex-shrink:0;background:linear-gradient(135deg,var(--sky),var(--sky3));display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;font-weight:600;overflow:hidden;box-shadow:0 2px 8px rgba(80,140,200,.12)}
+.avatar-sm img{width:100%;height:100%;object-fit:cover}
+.msg-col{max-width:70%;display:flex;flex-direction:column;align-items:flex-start;min-width:0}
+.msg-row.me .msg-col{align-items:flex-end}
+.bubble{padding:9px 13px;font-size:14px;line-height:1.55;word-break:break-word;white-space:pre-wrap;border-radius:20px;letter-spacing:.2px;max-width:100%}
+.msg-row.ta .bubble{background:#fff;color:var(--ink);box-shadow:0 2px 8px rgba(80,140,200,.06)}
+.msg-row.me .bubble{background:linear-gradient(135deg,#e5f0f8,#c5dfef);color:var(--ink);box-shadow:0 2px 10px rgba(80,140,200,.10)}
+.msg-t{font-size:9px;color:var(--faint);margin-top:4px;padding:0 5px;font-family:var(--mono)}
+.msg-narr-center{text-align:center;font-size:11px;color:#fff;padding:0 32px 10px;line-height:1.7;letter-spacing:.3px;width:100%;display:block;text-shadow:0 1px 1px rgba(60,90,130,.5)}
+.placeholder{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:10px;background:rgba(168,213,237,.25);color:var(--ink2);font-size:12px;font-style:italic}
+
+.drawer{position:fixed;inset:0;display:none;z-index:200}
+.drawer.on{display:block}
+.drawer-bg{position:absolute;inset:0;background:rgba(30,60,120,.28);backdrop-filter:blur(4px);animation:fadeIn .2s}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.drawer-content{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(165deg,#f6fafd,#e5f0f8);border-radius:24px 24px 0 0;padding:14px 18px calc(22px + env(safe-area-inset-bottom,0px));box-shadow:0 -8px 40px rgba(80,140,200,.15);animation:up .3s cubic-bezier(.22,.68,0,1);display:flex;flex-direction:column;max-height:72vh}
+@keyframes up{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.drawer-handle{width:40px;height:4px;border-radius:2px;background:rgba(120,160,200,.3);margin:0 auto 12px;flex-shrink:0}
+.drawer-content h3{font-size:13px;font-weight:700;text-align:center;margin-bottom:14px;letter-spacing:1px;flex-shrink:0}
+.set-row{display:flex;align-items:center;justify-content:space-between;width:100%;padding:14px 16px;margin-bottom:8px;border:none;background:#fff;border-radius:14px;font-size:14px;color:var(--ink);cursor:pointer;text-align:left;box-shadow:0 2px 8px rgba(80,140,200,.05);font-family:var(--font)}
+.set-row:active{transform:scale(.98);background:#f6fafd}
+.set-row.danger{color:#c9737d}
+.set-row .chev{color:var(--faint);font-size:18px;font-weight:300}
+.close-btn{width:100%;padding:13px;border:none;border-radius:14px;background:rgba(168,213,237,.3);color:var(--ink2);font-size:13px;font-weight:700;letter-spacing:1px;cursor:pointer;margin-top:6px;font-family:var(--font);flex-shrink:0}
+.close-btn:active{transform:scale(.97)}
+
+.date-list{flex:1;overflow-y:auto;padding-right:4px;-webkit-overflow-scrolling:touch;min-height:0}
+.date-item{display:flex;align-items:center;justify-content:space-between;width:100%;padding:13px 16px;margin-bottom:8px;border:none;background:#fff;border-radius:14px;cursor:pointer;box-shadow:0 2px 8px rgba(80,140,200,.05);font-family:var(--font);text-align:left}
+.date-item:active{transform:scale(.98);background:#f6fafd}
+.date-item .d-left{flex:1;min-width:0}
+.date-item .d-day{font-size:14px;font-weight:600;color:var(--ink);white-space:nowrap}
+.date-item .d-weekday{font-size:11px;color:var(--soft);margin-top:2px}
+.date-item .d-count{font-size:12px;font-weight:700;color:var(--ink2);background:rgba(168,213,237,.35);padding:4px 10px;border-radius:10px;flex-shrink:0;margin-left:10px}
+
+.empty{text-align:center;color:var(--soft);padding:60px 24px;font-size:13px;line-height:1.9}
+.empty .big{font-family:var(--serif);font-style:italic;font-size:15px;color:var(--ink2);margin-bottom:8px}
+</style>
+</head>
+<body>
+
+<div id="welcome" class="page on">
+  <div class="welcome-card">
+    <div class="logo">✚</div>
+    <h1>Akso · 记录查看器</h1>
+    <p class="sub">导入聊天记录 JSON<br>查看所有历史消息</p>
+    <button class="primary-btn" onclick="pickFile()">选择 JSON 文件</button>
+    <div class="drop-zone" id="dropZone">或把 .json 文件拖到这里</div>
+    <div class="hint">📁 数据只保存在本机，不会上传<br>支持「聊天导出」和「完整备份」两种格式</div>
+  </div>
+  <input type="file" id="fileInput" accept=".json,application/json" hidden>
+</div>
+
+<div id="listPage" class="page">
+  <div class="header">
+    <div class="title-wrap">
+      <div class="title">聊天记录</div>
+      <div class="sub" id="listSub"></div>
+    </div>
+    <button class="icon-btn" onclick="pickFile()" title="重新导入">↻</button>
+    <button class="icon-btn" onclick="resetAll()" title="清空所有">🗑</button>
+  </div>
+  <div class="chat-list" id="chatList"></div>
+</div>
+
+<div id="chatPage" class="page">
+  <div class="header">
+    <button class="back" onclick="closeChat()">‹</button>
+    <div class="title-wrap center">
+      <div class="title" id="chatTitle">—</div>
+      <div class="sub" id="chatSub"></div>
+    </div>
+    <button class="icon-btn" onclick="openDatePicker()" title="按日期查看">📅</button>
+    <button class="icon-btn" onclick="openSettings()">···</button>
+  </div>
+  <div class="chat-body" id="chatBody"></div>
+</div>
+
+<div id="drawer" class="drawer">
+  <div class="drawer-bg" onclick="closeSettings()"></div>
+  <div class="drawer-content">
+    <div class="drawer-handle"></div>
+    <h3>自定义</h3>
+    <button class="set-row" onclick="uploadAgentAvatar()"><span>🖼 更换 Ta 的头像</span><span class="chev">›</span></button>
+    <button class="set-row" onclick="uploadMeAvatar()"><span>🖼 更换我的头像</span><span class="chev">›</span></button>
+    <button class="set-row" onclick="uploadBg()"><span>🌄 更换聊天背景</span><span class="chev">›</span></button>
+    <button class="set-row danger" onclick="clearBg()"><span>✕ 清除聊天背景</span></button>
+    <button class="close-btn" onclick="closeSettings()">关闭</button>
+  </div>
+</div>
+
+<div id="dateDrawer" class="drawer">
+  <div class="drawer-bg" onclick="closeDatePicker()"></div>
+  <div class="drawer-content">
+    <div class="drawer-handle"></div>
+    <h3>按日期查看</h3>
+    <div class="date-list" id="dateList"></div>
+    <button class="close-btn" onclick="closeDatePicker()">关闭</button>
+  </div>
+</div>
+
+<input type="file" id="imgInput" accept="image/*" hidden>
+
+<script>
+var db = null;
+var chats = [];
+var currentChat = null;
+var renderLimit = 80;
+var viewStartIdx = null;  // null = 默认视图（末尾）；数字 = 从该索引开始渲染
+var imgCache = {};
+var uploadTarget = null;
+
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7) }
+function p2(n){ return n<10 ? '0'+n : ''+n }
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') }
+function initial(n){ if(!n) return '?'; var t=String(n).trim(); return t?t[0]:'?' }
+function fmtTime(t){ var d=new Date(t); return p2(d.getHours())+':'+p2(d.getMinutes()) }
+function fmtFull(t){ var d=new Date(t); return d.getFullYear()+'/'+p2(d.getMonth()+1)+'/'+p2(d.getDate())+' '+p2(d.getHours())+':'+p2(d.getMinutes()) }
+function dayKey(t){ var d=new Date(t); return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate()) }
+function weekdayCN(t){ var d=new Date(t); return ['周日','周一','周二','周三','周四','周五','周六'][d.getDay()] }
+
+function openDB(){
+  return new Promise(function(res){
+    try{
+      var req = indexedDB.open('akso_viewer', 1);
+      req.onupgradeneeded = function(e){
+        var d = e.target.result;
+        if(!d.objectStoreNames.contains('kv')) d.createObjectStore('kv');
+      };
+      req.onsuccess = function(e){ db = e.target.result; res() };
+      req.onerror = function(){ res() };
+    }catch(e){ res() }
+  });
+}
+function dbSet(k,v){
+  return new Promise(function(res){
+    if(!db) return res();
+    try{
+      var t = db.transaction('kv','readwrite');
+      t.objectStore('kv').put(v,k);
+      t.oncomplete = function(){ res() };
+      t.onerror = function(){ res() };
+    }catch(e){ res() }
+  });
+}
+function dbGet(k){
+  return new Promise(function(res){
+    if(!db) return res(null);
+    try{
+      var t = db.transaction('kv','readonly');
+      var q = t.objectStore('kv').get(k);
+      q.onsuccess = function(){ res(q.result||null) };
+      q.onerror = function(){ res(null) };
+    }catch(e){ res(null) }
+  });
+}
+function dbDel(k){
+  if(!db) return;
+  try{ db.transaction('kv','readwrite').objectStore('kv').delete(k) }catch(e){}
+}
+function loadImg(k){
+  if(!k) return Promise.resolve('');
+  if(imgCache[k] !== undefined) return Promise.resolve(imgCache[k]);
+  return dbGet(k).then(function(v){ imgCache[k]=v||''; return v||'' });
+}
+
+function parseNarration(raw){
+  var narrs = [];
+  var text = raw || '';
+  text = text.replace(/\*\*([\s\S]+?)\*\*/g, function(_,t){ t=t.trim(); if(t) narrs.push(t); return '' });
+  text = text.replace(/\*([\s\S]+?)\*/g, function(_,t){ t=t.trim(); if(t) narrs.push(t); return '' });
+  text = text.replace(/（([^（）]*(?:（[^（）]*）[^（）]*)*)）/g, function(_,t){ t=t.trim(); if(t) narrs.push(t); return '' });
+  text = text.replace(/\(([^()]*(?:\([^()]*\)[^()]*)*)\)/g, function(m,t){
+    var s=t.trim();
+    if(/^https?:|^www\./i.test(s)) return m;
+    if(s) narrs.push(s);
+    return '';
+  });
+  text = text.replace(/【([\s\S]+?)】/g, function(_,t){ t=t.trim(); if(t) narrs.push(t); return '' });
+  text = text.replace(/「([\s\S]+?)」/g, function(_,t){ t=t.trim(); if(t) narrs.push(t); return '' });
+  text = text.replace(/\*+/g,'');
+  text = text.replace(/（[^（）]*）/g,'');
+  text = text.replace(/\([^()]*\)/g,'');
+  text = text.replace(/[（）()]/g,'');
+  text = text.replace(/[【】「」『』〈〉]/g,'');
+  text = text.replace(/\[([^\[\]]*?)\]/g, function(m,t){
+    var s=t.trim();
+    if(/^emoji:\d+/i.test(s)) return m;
+    return '';
+  });
+  text = text.replace(/^[ \t\u3000]+|[ \t\u3000]+$/gm,'');
+  text = text.replace(/\n{2,}/g,'\n').trim();
+  var BAD = /^(心理|动作|旁白|心声|内心|神态|描写|心理活动|动作描写|神态描写|场景描写|场景|内心os|os|inner|thought)$/i;
+  narrs = narrs.map(function(s){
+    if(!s) return '';
+    var t = String(s).trim();
+    t = t.replace(/^(心理|动作|旁白|心声|内心|神态|描写|心理活动|动作描写|神态描写|场景描写)\s*[:：,，、]?\s+/i,'').trim();
+    t = t.replace(/^(心理|动作|旁白|心声|内心|神态|描写)\s*[:：,，、]\s*/i,'').trim();
+    return t;
+  }).filter(function(s){
+    if(!s) return false;
+    var st = s.replace(/[\s:：、,，。.!！？?…]+/g,'');
+    if(BAD.test(st)) return false;
+    if(st.length < 2) return false;
+    return true;
+  });
+  return { dialogue: text, narrs: narrs };
+}
+
+function pickFile(){ document.getElementById('fileInput').click() }
+
+document.getElementById('fileInput').addEventListener('change', function(e){
+  var f = e.target.files[0];
+  if(!f) return;
+  e.target.value = '';
+  var reader = new FileReader();
+  reader.onload = function(){
+    try{ importData(JSON.parse(reader.result)) }
+    catch(err){ alert('JSON 解析失败：' + err.message) }
+  };
+  reader.readAsText(f);
+});
+
+var dz = document.getElementById('dropZone');
+dz.addEventListener('dragover', function(e){ e.preventDefault(); dz.classList.add('hover') });
+dz.addEventListener('dragleave', function(){ dz.classList.remove('hover') });
+dz.addEventListener('drop', function(e){
+  e.preventDefault(); dz.classList.remove('hover');
+  var f = e.dataTransfer.files[0];
+  if(!f) return;
+  var reader = new FileReader();
+  reader.onload = function(){
+    try{ importData(JSON.parse(reader.result)) }
+    catch(err){ alert('JSON 解析失败：' + err.message) }
+  };
+  reader.readAsText(f);
+});
+
+function importData(json){
+  var newChats = [];
+  if(json && Array.isArray(json.conversations)){
+    newChats = json.conversations.map(function(c){
+      return {
+        agentId: c.agentId || uid(),
+        agentName: c.agentName || '未知',
+        systemPrompt: c.agentSystemPrompt || '',
+        messages: (c.messages||[]).map(function(m){
+          return {
+            id: m.id || uid(),
+            role: m.role === 'me' ? 'me' : 'ta',
+            content: m.content || '',
+            time: m.time || Date.now()
+          };
+        })
+      };
+    });
+  }else if(json && json.state && Array.isArray(json.state.agents) && json.state.chats){
+    var st = json.state;
+    newChats = st.agents.map(function(a){
+      var msgs = (st.chats[a.id] || []).map(function(m){
+        return {
+          id: m.id || uid(),
+          role: m.role === 'me' ? 'me' : 'ta',
+          content: m.content || '',
+          time: m.time || Date.now()
+        };
+      });
+      return {
+        agentId: a.id,
+        agentName: a.name || '未知',
+        systemPrompt: a.systemPrompt || '',
+        messages: msgs
+      };
+    }).filter(function(c){ return c.messages.length > 0 });
+  }else{
+    alert('无法识别此 JSON 格式\n\n支持：\n• 聊天导出（含 conversations）\n• 完整备份（含 state）');
+    return;
+  }
+
+  // 增量合并
+  newChats.forEach(function(nc){
+    var existing = chats.find(function(c){ return c.agentId === nc.agentId });
+    if(existing){
+      var existingKeys = {};
+      existing.messages.forEach(function(m){ existingKeys[m.time + '|' + m.content] = 1 });
+      nc.messages.forEach(function(m){
+        var key = m.time + '|' + m.content;
+        if(!existingKeys[key]){
+          existing.messages.push(m);
+          existingKeys[key] = 1;
+        }
+      });
+      existing.messages.sort(function(a,b){ return a.time - b.time });
+    }else{
+      nc.messages.sort(function(a,b){ return a.time - b.time });
+      chats.push(nc);
+    }
+  });
+
+  chats.sort(function(a,b){
+    var ta = a.messages[a.messages.length-1];
+    var tb = b.messages[b.messages.length-1];
+    return (tb?tb.time:0) - (ta?ta.time:0);
+  });
+
+  saveChats();
+  showList();
+  alert('已导入！共 ' + chats.length + ' 个对话 · ' +
+    chats.reduce(function(s,c){return s+c.messages.length},0) + ' 条消息');
+}
+
+function saveChats(){
+  var slim = chats.map(function(c){
+    return {
+      agentId: c.agentId, agentName: c.agentName, systemPrompt: c.systemPrompt,
+      messages: c.messages.map(function(m){
+        return {id:m.id, role:m.role, content:m.content, time:m.time};
+      })
+    };
+  });
+  dbSet('saved_chats', slim);
+}
+
+function setPage(id){
+  document.querySelectorAll('.page').forEach(function(p){
+    p.classList.toggle('on', p.id === id);
+  });
+}
+
+function showList(){
+  currentChat = null;
+  viewStartIdx = null;
+  setPage('listPage');
+  renderChatList();
+  document.getElementById('listSub').textContent =
+    chats.length + ' 个对话 · ' +
+    chats.reduce(function(s,c){return s+c.messages.length},0) + ' 条消息';
+}
+
+function renderChatList(){
+  var box = document.getElementById('chatList');
+  if(!chats.length){
+    box.innerHTML = '<div class="empty"><div class="big">还没有导入</div>点右上角 ↻ 重新导入</div>';
+    return;
+  }
+  var html = '';
+  chats.forEach(function(c, i){
+    var last = c.messages[c.messages.length - 1];
+    var preview = last ? (last.content || '[空消息]').replace(/\n+/g,' ') : '（无消息）';
+    html += '<div class="list-item" onclick="openChat(' + i + ')">';
+    html += '<div class="item-avatar" id="listAv_' + i + '">' + initial(c.agentName) + '</div>';
+    html += '<div class="item-mid">';
+    html += '<div class="item-name">' + esc(c.agentName) + '</div>';
+    html += '<div class="item-preview">' + esc(preview.slice(0,40)) + '</div>';
+    html += '</div><div class="item-right">';
+    if(last) html += '<div class="item-time">' + fmtTime(last.time) + '</div>';
+    html += '<div class="item-count">' + c.messages.length + '</div>';
+    html += '</div></div>';
+  });
+  box.innerHTML = html;
+  chats.forEach(function(c, i){
+    loadImg('avatar_' + c.agentId).then(function(src){
+      if(src){
+        var el = document.getElementById('listAv_' + i);
+        if(el) el.innerHTML = '<img src="' + src + '">';
+      }
+    });
+  });
+}
+
+function openChat(idx){
+  currentChat = chats[idx];
+  renderLimit = 80;
+  viewStartIdx = null;  // 重置为默认视图（末尾）
+  setPage('chatPage');
+  document.getElementById('chatTitle').textContent = currentChat.agentName;
+  document.getElementById('chatSub').textContent = currentChat.messages.length + ' 条消息';
+  loadImg('bg_' + currentChat.agentId).then(function(bg){
+    var body = document.getElementById('chatBody');
+    if(bg){
+      body.style.backgroundImage = 'url(' + bg + ')';
+      body.style.backgroundSize = 'cover';
+      body.style.backgroundPosition = 'center';
+    }else{
+      body.style.backgroundImage = '';
+      body.style.backgroundColor = '#fafcff';
+    }
+    renderMessages({});
+  });
+}
+
+function closeChat(){ currentChat = null; viewStartIdx = null; showList() }
+
+/* ============ 消息渲染（支持按索引跳转） ============ */
+function renderMessages(options){
+  options = options || {};
+  if(!currentChat) return;
+  var body = document.getElementById('chatBody');
+  var all = currentChat.messages;
+  var total = all.length;
+
+  if(total === 0){
+    body.innerHTML = '<div class="empty"><div class="big">这个对话没有消息</div></div>';
+    return;
+  }
+
+  var oldHeight = body.scrollHeight;
+  var oldTop = body.scrollTop;
+
+  // 计算渲染范围
+  var startIdx;
+  if(viewStartIdx === null || viewStartIdx === undefined){
+    startIdx = Math.max(0, total - renderLimit);
+  }else{
+    startIdx = Math.max(0, Math.min(viewStartIdx, total - 1));
+  }
+  var endIdx = Math.min(startIdx + renderLimit, total);
+  var renderList = all.slice(startIdx, endIdx);
+  var hasEarlier = startIdx > 0;
+  var hasLater = endIdx < total;
+  var earlierCount = startIdx;
+  var laterCount = total - endIdx;
+
+  Promise.all([
+    loadImg('avatar_' + currentChat.agentId),
+    loadImg('me_avatar')
+  ]).then(function(res){
+    var agentAv = res[0], meAv = res[1];
+    var html = '';
+
+    if(hasEarlier){
+      html += '<div class="load-more" onclick="loadEarlier()">↟ 加载更早（还有 ' + earlierCount + ' 条）</div>';
+    }
+
+    var lastDay = '';
+    renderList.forEach(function(m){
+      var day = new Date(m.time).toDateString();
+      if(day !== lastDay){
+        html += '<div class="day-sep">' + fmtFull(m.time) + '</div>';
+        lastDay = day;
+      }
+      html += renderBubble(m, agentAv, meAv);
+    });
+
+    if(hasLater){
+      html += '<div class="load-more" onclick="loadLater()">↡ 加载更晚（还有 ' + laterCount + ' 条）</div>';
+    }
+
+    body.innerHTML = html;
+
+    requestAnimationFrame(function(){
+      if(options.jumpToTop){
+        body.scrollTop = 0;
+      }else if(options.keepScroll){
+        body.scrollTop = oldTop + (body.scrollHeight - oldHeight);
+      }else{
+        body.scrollTop = body.scrollHeight;
+      }
+    });
+  });
+}
+
+function renderBubble(m, agentAv, meAv){
+  var isMe = m.role === 'me';
+  var avImg;
+  if(isMe){
+    avImg = meAv ? '<img src="' + meAv + '">' : initial('我');
+  }else{
+    avImg = agentAv ? '<img src="' + agentAv + '">' : initial(currentChat.agentName);
+  }
+  var avH = '<div class="avatar-sm">' + avImg + '</div>';
+  var parsed = parseNarration(m.content || '');
+  var dialogue = parsed.dialogue;
+  var narrs = parsed.narrs;
+  var out = '';
+  if(dialogue){
+    var content;
+    if(dialogue === '[图片]') content = '<div class="placeholder">🖼 图片（导出未包含）</div>';
+    else if(dialogue === '[表情包]') content = '<div class="placeholder">😊 表情包（导出未包含）</div>';
+    else content = esc(dialogue);
+    out += '<div class="msg-row ' + (isMe ? 'me' : 'ta') + '">' + avH +
+      '<div class="msg-col">' +
+      '<div class="bubble">' + content + '</div>' +
+      '<div class="msg-t">' + fmtTime(m.time) + '</div>' +
+      '</div></div>';
+  }
+  if(narrs.length){
+    out += '<div class="msg-narr-center">' +
+      narrs.map(function(t){ return esc(t) }).join('<br>') + '</div>';
+  }
+  return out;
+}
+
+/* 加载更早：向前扩展 */
+function loadEarlier(){
+  if(viewStartIdx === null){
+    var total = currentChat.messages.length;
+    viewStartIdx = Math.max(0, total - renderLimit);
+  }
+  var step = Math.min(80, viewStartIdx);
+  if(step <= 0) return;
+  viewStartIdx -= step;
+  renderLimit += step;
+  renderMessages({ keepScroll: true });
+}
+
+/* 加载更晚：跳到后面一段 */
+function loadLater(){
+  var all = currentChat.messages;
+  var startIdx = (viewStartIdx === null) ? Math.max(0, all.length - renderLimit) : viewStartIdx;
+  var endIdx = Math.min(startIdx + renderLimit, all.length);
+  if(endIdx >= all.length) return;
+  viewStartIdx = endIdx;
+  renderLimit = 80;
+  renderMessages({ jumpToTop: true });
+}
+
+/* ============ 日期选择器 ============ */
+function openDatePicker(){
+  if(!currentChat) return;
+  var all = currentChat.messages;
+  var dayMap = {};
+  all.forEach(function(m){
+    var k = dayKey(m.time);
+    if(!dayMap[k]) dayMap[k] = { count: 0, firstTs: m.time };
+    dayMap[k].count++;
+  });
+  var days = Object.keys(dayMap).sort().reverse();  // 最新在前
+  var box = document.getElementById('dateList');
+
+  if(!days.length){
+    box.innerHTML = '<div class="empty" style="padding:30px 20px">没有消息</div>';
+  }else{
+    var html = '';
+    days.forEach(function(d){
+      var info = dayMap[d];
+      html += '<button class="date-item" onclick="jumpToDate(\'' + d + '\')">' +
+        '<div class="d-left">' +
+        '<div class="d-day">' + d.replace(/-/g, ' / ') + '</div>' +
+        '<div class="d-weekday">' + weekdayCN(info.firstTs) + '</div>' +
+        '</div>' +
+        '<div class="d-count">' + info.count + ' 条</div>' +
+        '</button>';
+    });
+    box.innerHTML = html;
+  }
+
+  document.getElementById('dateDrawer').classList.add('on');
+}
+
+function closeDatePicker(){
+  document.getElementById('dateDrawer').classList.remove('on');
+}
+
+function jumpToDate(dayStr){
+  var all = currentChat.messages;
+  var targetDay = new Date(dayStr + 'T00:00:00').toDateString();
+  var startIdx = -1, endIdx = -1;
+  for(var i = 0; i < all.length; i++){
+    if(new Date(all[i].time).toDateString() === targetDay){
+      if(startIdx < 0) startIdx = i;
+      endIdx = i;
+    }
+  }
+  if(startIdx < 0){ alert('该日期没有消息'); return; }
+
+  var dayCount = endIdx - startIdx + 1;
+  // 至少渲染该日期全部 + 20 条后续；最少 80；最多 500
+  var needCount = Math.max(80, Math.min(dayCount + 20, 500));
+  viewStartIdx = startIdx;
+  renderLimit = needCount;
+  closeDatePicker();
+  renderMessages({ jumpToTop: true });
+
+  // 顶栏更新提示
+  document.getElementById('chatSub').textContent = dayStr + ' · ' + dayCount + ' 条';
+}
+
+/* ============ 头像 / 壁纸 ============ */
+function openSettings(){ if(currentChat) document.getElementById('drawer').classList.add('on') }
+function closeSettings(){ document.getElementById('drawer').classList.remove('on') }
+function uploadAgentAvatar(){ uploadTarget='agent_avatar'; triggerImg() }
+function uploadMeAvatar(){ uploadTarget='me_avatar'; triggerImg() }
+function uploadBg(){ uploadTarget='chat_bg'; triggerImg() }
+function triggerImg(){ var inp=document.getElementById('imgInput'); inp.value=''; inp.click() }
+
+function clearBg(){
+  if(!currentChat) return;
+  dbDel('bg_' + currentChat.agentId);
+  delete imgCache['bg_' + currentChat.agentId];
+  var body = document.getElementById('chatBody');
+  body.style.backgroundImage = '';
+  body.style.backgroundColor = '#fafcff';
+  closeSettings();
+}
+
+document.getElementById('imgInput').addEventListener('change', function(e){
+  var f = e.target.files[0];
+  if(!f || !uploadTarget) return;
+  e.target.value = '';
+  var reader = new FileReader();
+  reader.onload = function(){
+    compress(reader.result, 900, .85).then(function(data){
+      if(!data){ alert('图片解析失败'); return }
+      if(uploadTarget === 'agent_avatar' && currentChat){
+        var key = 'avatar_' + currentChat.agentId;
+        dbSet(key, data).then(function(){
+          imgCache[key] = data;
+          renderChatList();
+          renderMessages({});
+          closeSettings();
+        });
+      }else if(uploadTarget === 'me_avatar'){
+        dbSet('me_avatar', data).then(function(){
+          imgCache['me_avatar'] = data;
+          renderMessages({});
+          closeSettings();
+        });
+      }else if(uploadTarget === 'chat_bg' && currentChat){
+        var key2 = 'bg_' + currentChat.agentId;
+        dbSet(key2, data).then(function(){
+          imgCache[key2] = data;
+          var body = document.getElementById('chatBody');
+          body.style.backgroundImage = 'url(' + data + ')';
+          body.style.backgroundSize = 'cover';
+          body.style.backgroundPosition = 'center';
+          closeSettings();
+        });
+      }
+      uploadTarget = null;
+    });
+  };
+  reader.readAsDataURL(f);
+});
+
+function compress(src, maxW, q){
+  return new Promise(function(res){
+    var img = new Image();
+    img.onload = function(){
+      var w = img.width, h = img.height;
+      if(w > maxW){ h = h * maxW / w; w = maxW }
+      var c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      c.getContext('2d').drawImage(img, 0, 0, w, h);
+      try{ res(c.toDataURL('image/jpeg', q || .85)) }catch(e){ res('') }
+    };
+    img.onerror = function(){ res('') };
+    img.src = src;
+  });
+}
+
+function resetAll(){
+  if(!confirm('清空所有导入的数据和自定义头像/壁纸？')) return;
+  chats = [];
+  imgCache = {};
+  dbSet('saved_chats', []);
+  dbDel('me_avatar');
+  setPage('welcome');
+}
+
+openDB().then(function(){
+  return dbGet('saved_chats');
+}).then(function(saved){
+  if(saved && saved.length){
+    chats = saved;
+    chats.sort(function(a,b){
+      var ta = a.messages[a.messages.length-1];
+      var tb = b.messages[b.messages.length-1];
+      return (tb?tb.time:0) - (ta?ta.time:0);
+    });
+    showList();
+  }
+});
+</script>
+</body>
+</html>
